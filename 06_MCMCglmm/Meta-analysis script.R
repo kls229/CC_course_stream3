@@ -1,11 +1,37 @@
 
+##%######################################################%##
+#                                                          #
+####           INTRO TO THE MCMCGLMM PACKAGE            ####
+#                                                          #
+##%######################################################%##
+
+# https://ourcodingclub.github.io/tutorials/mcmcglmm/index.html
+getwd()
+setwd("C:/Users/katie/OneDrive/PhD/My_Stats_from_Scratch/CC_course_stream3-master/CC_course_stream3/06_MCMCglmm")
+
+
 ### Load packages
 
 library("MCMCglmm") # for meta-analysis
 library("dplyr") # for data manipulation
+View(migrationdata)
 
-migrationdata <- read.csv(~"migration_metadata.csv", header = T) # import dataset
+
+### Meta-analysis ----
+
+# Statistical analysis of results from many individual studies on similar subjects.
+
+## What is MCMCglmmm ----
+
+# MCMCglmm fits Generalised Linear Mixed-effects Models using a Markov chain Monte Carlo approach under a Bayesian statistical framework.
+
+migrationdata <- read.csv("migration_metadata.csv", header = T) # import dataset
 View(migrationdata) # have a look at the dataset. Check out the Predictor variable. There are two, time and temperature.
+
+
+# There is no fundamental distinction between (what we call) fixed effects and random effects in a Bayesian analysis. The key is in understanding how each type of analysis deals with variance.
+
+# radnom/fixed effects are different to random/ fixed meta-analyses
 
 ### Create dataset
 
@@ -14,18 +40,39 @@ filter(Predictor == "year") -> migrationtime # this reduces the dataset to one p
 
 ### Plot data
 
-plot(migrationtime$Slope, I(1/migrationtime$SE)) # this makes the funnel plot.
+plot(migrationtime$Slope, I(1/migrationtime$SE)) # this makes the funnel plo which is typically used to visualse data for meta analyses 
 
-### First model
+## plotting the predictor variable against 1/standard error for each data point. This weights each study in the plot by its precision, 
+# ultimately giving less weight to studies with high standard error. In this case, Slope is change in arrival date in days/year.
+
+
+plot(migrationtime$Slope, I(1/migrationtime$SE)) # this makes the funnel plot of slope (rate of change in days/year) and precision (1/SE)
+
+#  effective sample size should be quite high (I usually aim for 1000-2000). More complicated models often require more iterations to achieve a comparable effective sample size.
+
+### First model - random effects
+
+# Intercept as a fiexed effect - intercept estimate the average change in arrival date across all data points.
 
 randomtest <- MCMCglmm (Slope~1, random = ~Species+Location+Study, data = migrationtime)
 summary(randomtest)
 
-### Checking for significance
+# MCMCglmm has run through 13,000 iterations of the model and sampled 1000 of them to provide a posterior distribution.
+
+### Checking for significance ----
 
 # Plot the posterior distribution as a histogram to check for significance and whether it's been well estimated or not
 # Variance cannot be zero, and therefore if the mean value is pushed up against zero your effect is not significant
 # The larger the spread of the histogram, the less well estimated the distribution is.
+
+#We can accept that a fixed effect is significant when the credible intervals do not span zero, this is because if the posterior distribution spans zero, we cannot be confident that it is not zero
+
+# With random effects, we estimate the variance. As variance cannot be zero or negative, we accept that a random effect is significant when the distribution of the variance is not pushed up against zero. To check this, we can plot the histogram of each posterior distribution.
+
+# Plot the posterior distribution as a histogram to check for significance and whether it's been well estimated or not
+# Variance cannot be zero, and therefore if the mean value is pushed up against zero your effect is not significant
+# The larger the spread of the histogram, the less well estimated the distribution is.
+
 
 par(mfrow = c(1,3))
 
@@ -33,14 +80,32 @@ hist(mcmc(randomtest$VCV)[,"Study"])
 hist(mcmc(randomtest$VCV)[,"Location"])
 hist(mcmc(randomtest$VCV)[,"Species"])
 
+par(mfrow=c(1,1)) # Reset the plot panel back to single plots
+
+# Location and species are near 0 - random effects are not significant 
+
+
 ### Assessing convergence
 
 plot(randomtest$Sol) # Fixed effects
 plot(randomtest$VCV) # Random effects
 
-###### Priors ######
+# To make sure the model has converged, can increase number of iterations (nitt = ), increase the burn (burnin = ), increase thinning interval (thin =) or use a stronger prior.
+
+###### Priors ###### ----
+
+# Priors are what we think the mean/varinace of a parameter might be
+# Fit a seperate prior for the fixed and random effect, and the residual
+# MCMC works out how the prior will interact with the distribution of the data to get the posterier distribution
+# Weakly informative - used in situations where we don't have much prior knowledge 
+# Informative priors provide ino that is crucial to the estimation of the model & will shape P.D quite a bit.
+
 
 ### Parameter expanded priors, model 1
+
+# prior = prior1: parameter extended priors for the random effects 
+
+#  The parameter expansion refers to the fact that we have included a prior mean (alpha.mu) and (co)variance matrix (alpha.V) as well as V and nu
 
 a <- 1000
 prior1<-list(R=list(V=diag(1),nu=0.002)
@@ -52,6 +117,8 @@ randomprior <- MCMCglmm (Slope~1, random = ~Species+Location+Study, data = migra
 summary(randomprior)
 plot(randomprior$Sol)
 plot(randomprior$VCV)
+
+# Got to here.. come back?
 
 #### Parameter expanded priors, variance of sampling error fixed at 1
 
@@ -135,7 +202,7 @@ fixedtest <- MCMCglmm (Slope~Migration_distance+Continent, random = ~Species+Loc
 
 ####### Now it's your turn #######
 
-#### Now it’s your turn!
+#### Now it?s your turn!
 
 # 1. Filter the data by rows which have temperature as the predictor
 # 2. Plot the data using a funnel plot
